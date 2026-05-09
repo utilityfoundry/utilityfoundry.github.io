@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shopping Budget Tracker v3</title>
+<script src="https://unpkg.com/@zxing/library@latest"></script>
+<style>
+:root{
+  --bg:#111827;--card:#1f2937;--input:#0f172a;--text:#fff;--muted:#cbd5e1;
+  --accent:#38bdf8;--good:#22c55e;--warn:#f59e0b;--bad:#ef4444;--line:#475569;
+}
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:15px 15px 85px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:18px;margin:0 0 8px}
+.card{background:var(--card);padding:15px;border-radius:14px;margin-bottom:12px;border:1px solid rgba(255,255,255,.08)}
+input,button,textarea{width:100%;padding:12px;margin-top:8px;border-radius:10px;border:none;font-size:16px}
+input,textarea{background:var(--input);color:var(--text);border:1px solid var(--line)}
+textarea{min-height:54px;resize:vertical}
+button{background:var(--accent);color:#000;font-weight:bold}
+button.secondary{background:#334155;color:#fff}
+button.danger{background:var(--bad);color:#fff}
+button.good{background:var(--good);color:#02140a}
+button:disabled{opacity:.55}
+.item{padding:10px;background:var(--input);border-radius:10px;margin-top:8px;border:1px solid rgba(255,255,255,.08)}
+.total{font-size:34px;font-weight:bold;margin-top:6px}
+.small{color:var(--muted);font-size:14px;line-height:1.35}
+.bar{height:18px;background:#334155;border-radius:999px;overflow:hidden;margin-top:10px}
+.fill{height:100%;width:0%;background:var(--good)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+video{width:100%;max-height:320px;background:#000;border-radius:12px;margin-top:10px;display:none}
+footer{position:fixed;left:0;right:0;bottom:0;background:#020617;border-top:1px solid #334155;padding:10px 15px}
+.footer-inner{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.footer-total{font-weight:bold;font-size:18px}
+.badText{color:#fecaca}.warnText{color:#fde68a}.goodText{color:#bbf7d0}
+</style>
+</head>
+<body>
+
+<h1>Shopping Budget Tracker v3</h1>
+<div class="small">One box to search, scan, price, and add. Price entry: 248 = $2.48.</div>
+
+<div class="card">
+  <h2>Budget</h2>
+  <input id="budget" inputmode="numeric" placeholder="Budget limit, example 12500 = $125.00">
+  <div class="total" id="total">$0.00</div>
+  <div class="small" id="status">No limit set</div>
+  <div class="bar"><div class="fill" id="fill"></div></div>
+</div>
+
+<div class="card">
+  <h2>Find / Add Item</h2>
+
+  <input id="name" placeholder="Item name or keywords, example: Equate antacid tablets">
+  <input id="barcode" inputmode="numeric" placeholder="Barcode / UPC if scanned or typed">
+
+  <div class="buttons">
+    <button onclick="searchWalmart()">Search Walmart</button>
+    <button onclick="startScan()" class="good" id="scanBtn">Scan Barcode</button>
+  </div>
+
+  <button onclick="stopScan()" class="secondary" id="stopBtn" disabled>Stop Scan</button>
+  <video id="video" playsinline></video>
+  <div class="small" id="scanStatus">Camera scanner uses ZXing. It may need Chrome/Samsung Internet and permission to use the camera.</div>
+
+  <div class="row">
+    <input id="price" inputmode="numeric" placeholder="Price: 248 = $2.48">
+    <input id="qty" inputmode="numeric" value="1" placeholder="Qty">
+  </div>
+  <div class="small" id="pricePreview">Price preview: $0.00</div>
+
+  <textarea id="note" placeholder="Optional note"></textarea>
+  <button onclick="addItem()" class="good">Add Item</button>
+</div>
+
+<div class="card">
+  <h2>Cart</h2>
+  <div class="small" id="summary">No items yet.</div>
+  <div id="items"></div>
+  <button onclick="resetCart()" class="danger">Reset Cart</button>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div>
+      <div class="footer-total" id="footerTotal">$0.00 total</div>
+      <div class="small" id="footerStatus">Set a budget to track spending.</div>
+    </div>
+    <button onclick="addItem()">Add</button>
+  </div>
+</footer>
+
+<script>
+const CART_KEY = "shopping_budget_tracker_v3_cart";
+const BUDGET_KEY = "shopping_budget_tracker_v3_budget";
+
+let items = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
+let codeReader = null;
+let scanning = false;
+
+function $(id){return document.getElementById(id);}
+function centsToDollars(raw){
+  let digits = String(raw || "").replace(/\D/g,"");
+  if(!digits) return 0;
+  return Number(digits) / 100;
+}
+function money(v){
+  return Number(v || 0).toLocaleString("en-US",{style:"currency",currency:"USD"});
+}
+function save(){
+  localStorage.setItem(CART_KEY, JSON.stringify(items));
+  localStorage.setItem(BUDGET_KEY, $("budget").value || "");
+}
+function total(){
+  return items.reduce((sum,item)=>sum + (Number(item.price)||0)*(Number(item.qty)||1),0);
+}
+function updatePricePreview(){
+  $("pricePreview").innerText = "Price preview: " + money(centsToDollars($("price").value));
+}
+function render(){
+  const t = total();
+  $("total").innerText = money(t);
+  $("footerTotal").innerText = money(t) + " total";
+
+  const b = centsToDollars($("budget").value);
+  const fill = $("fill");
+  const status = $("status");
+  const footerStatus = $("footerStatus");
+
+  if(b > 0){
+    const remaining = b - t;
+    const pct = Math.min(100, Math.max(0, (t / b) * 100));
+    fill.style.width = pct + "%";
+    fill.style.background = pct >= 100 ? "#ef4444" : pct >= 80 ? "#f59e0b" : "#22c55e";
+
+    if(remaining >= 0){
+      status.className = pct >= 80 ? "small warnText" : "small goodText";
+      status.innerText = money(remaining) + " remaining. You are " + pct.toFixed(0) + "% of the way to your limit.";
+      footerStatus.innerText = money(remaining) + " left before " + money(b);
+    }else{
+      status.className = "small badText";
+      status.innerText = money(Math.abs(remaining)) + " over budget.";
+      footerStatus.innerText = money(Math.abs(remaining)) + " over budget.";
+    }
+  }else{
+    fill.style.width = "0%";
+    status.className = "small";
+    status.innerText = "No limit set";
+    footerStatus.innerText = "Set a budget to track spending.";
+  }
+
+  $("summary").innerText = items.length ? items.length + " item line(s)." : "No items yet.";
+  $("items").innerHTML = items.map((item,i)=>{
+    const line = item.price * item.qty;
+    return `<div class="item">
+      <b>${escapeHtml(item.name || "Item")}</b><br>
+      <span class="small">
+        ${money(item.price)} x ${item.qty} = <b>${money(line)}</b><br>
+        ${item.barcode ? "Barcode: " + escapeHtml(item.barcode) + "<br>" : ""}
+        ${item.note ? "Note: " + escapeHtml(item.note) + "<br>" : ""}
+      </span>
+      <div class="buttons">
+        <button onclick="editItem(${i})" class="secondary">Edit</button>
+        <button onclick="deleteItem(${i})" class="danger">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+function escapeHtml(s){
+  return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function addItem(){
+  const price = centsToDollars($("price").value);
+  const qty = Math.max(1, Number(String($("qty").value||"1").replace(/\D/g,"")) || 1);
+  const name = $("name").value.trim();
+  const barcode = $("barcode").value.trim();
+
+  if(!name && !barcode){ alert("Enter item name, keywords, or scan barcode first."); return; }
+  if(price <= 0){ alert("Enter a price. Example: 248 for $2.48"); return; }
+
+  items.push({
+    name: name || "Barcode " + barcode,
+    price,
+    qty,
+    barcode,
+    note: $("note").value.trim()
+  });
+
+  $("name").value = "";
+  $("barcode").value = "";
+  $("price").value = "";
+  $("qty").value = "1";
+  $("note").value = "";
+  updatePricePreview();
+  save();
+  render();
+}
+function editItem(i){
+  const item = items[i];
+  if(!item) return;
+  $("name").value = item.name || "";
+  $("barcode").value = item.barcode || "";
+  $("price").value = Math.round((item.price || 0) * 100);
+  $("qty").value = item.qty || 1;
+  $("note").value = item.note || "";
+  items.splice(i,1);
+  updatePricePreview();
+  save();
+  render();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function deleteItem(i){
+  items.splice(i,1);
+  save();
+  render();
+}
+function resetCart(){
+  if(confirm("Reset cart?")){
+    items = [];
+    save();
+    render();
+  }
+}
+function searchWalmart(){
+  const name = $("name").value.trim();
+  const barcode = $("barcode").value.trim();
+  const q = name || barcode;
+  if(!q){ alert("Enter item keywords or barcode first."); return; }
+  window.open("https://www.walmart.com/search?q=" + encodeURIComponent(q), "_blank");
+}
+
+async function startScan(){
+  if(scanning) return;
+
+  if(typeof ZXing === "undefined"){
+    $("scanStatus").innerText = "Scanner library did not load. This usually means the phone/browser blocked the internet script.";
+    alert("Scanner library did not load. Try opening with internet access in Chrome or Samsung Internet.");
+    return;
+  }
+
+  try{
+    codeReader = new ZXing.BrowserMultiFormatReader();
+    const devices = await codeReader.listVideoInputDevices();
+
+    if(!devices || devices.length === 0){
+      $("scanStatus").innerText = "No camera found or camera permission denied.";
+      alert("No camera found or permission denied.");
+      return;
+    }
+
+    let backCamera = devices.find(d => /back|rear|environment/i.test(d.label));
+    let deviceId = backCamera ? backCamera.deviceId : devices[devices.length - 1].deviceId;
+
+    $("video").style.display = "block";
+    $("scanBtn").disabled = true;
+    $("stopBtn").disabled = false;
+    $("scanStatus").innerText = "Scanning... point camera at barcode.";
+    scanning = true;
+
+    codeReader.decodeFromVideoDevice(deviceId, "video", (result, err) => {
+      if(result){
+        const code = result.getText();
+        $("barcode").value = code;
+        if(!$("name").value.trim()) $("name").value = "Barcode " + code;
+        $("scanStatus").innerText = "Captured barcode: " + code;
+        stopScan();
+      }
+    });
+  }catch(e){
+    console.log(e);
+    $("scanStatus").innerText = "Could not start camera. Try Chrome/Samsung Internet and allow camera permission.";
+    alert("Could not start camera. Try Chrome/Samsung Internet and allow camera permission.");
+    stopScan();
+  }
+}
+function stopScan(){
+  try{
+    if(codeReader){
+      codeReader.reset();
+      codeReader = null;
+    }
+  }catch(e){}
+  scanning = false;
+  $("video").style.display = "none";
+  $("scanBtn").disabled = false;
+  $("stopBtn").disabled = true;
+}
+
+$("price").addEventListener("input", updatePricePreview);
+$("budget").addEventListener("input", ()=>{save();render();});
+
+$("budget").value = localStorage.getItem(BUDGET_KEY) || "";
+updatePricePreview();
+render();
+</script>
+</body>
+</html>
