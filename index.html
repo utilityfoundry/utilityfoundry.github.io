@@ -1,168 +1,98 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Shopping Budget Tracker v4</title>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shopping Budget Tracker v5</title>
 <script src="https://unpkg.com/@zxing/library@latest"></script>
 <style>
-:root{--bg:#111827;--card:#1f2937;--input:#0f172a;--text:#fff;--muted:#cbd5e1;--accent:#38bdf8;--good:#22c55e;--warn:#f59e0b;--bad:#ef4444;--line:#475569}
-*{box-sizing:border-box}
-body{font-family:Arial,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:15px 15px 85px}
-h1{font-size:22px;margin:0 0 4px}h2{font-size:18px;margin:0 0 8px}
-.card{background:var(--card);padding:15px;border-radius:14px;margin-bottom:12px;border:1px solid rgba(255,255,255,.08)}
-input,button,textarea{width:100%;padding:12px;margin-top:8px;border-radius:10px;border:none;font-size:16px}
-input,textarea{background:var(--input);color:var(--text);border:1px solid var(--line)}
-textarea{min-height:54px;resize:vertical}
-button{background:var(--accent);color:#000;font-weight:bold}
-button.secondary{background:#334155;color:#fff}button.danger{background:var(--bad);color:#fff}button.good{background:var(--good);color:#02140a}
-button:disabled{opacity:.55}.item{padding:10px;background:var(--input);border-radius:10px;margin-top:8px;border:1px solid rgba(255,255,255,.08)}
-.total{font-size:34px;font-weight:bold;margin-top:6px}.small{color:var(--muted);font-size:14px;line-height:1.35}
-.bar{height:18px;background:#334155;border-radius:999px;overflow:hidden;margin-top:10px}.fill{height:100%;width:0%;background:var(--good)}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.scanWrap{position:relative;margin-top:10px;display:none}video{width:100%;max-height:330px;background:#000;border-radius:12px;display:block}
-.scanBox{position:absolute;left:12%;right:12%;top:38%;height:24%;border:3px solid #22c55e;border-radius:12px;box-shadow:0 0 0 999px rgba(0,0,0,.28);pointer-events:none}
-footer{position:fixed;left:0;right:0;bottom:0;background:#020617;border-top:1px solid #334155;padding:10px 15px}
-.footer-inner{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.footer-total{font-weight:bold;font-size:18px}
-.badText{color:#fecaca}.warnText{color:#fde68a}.goodText{color:#bbf7d0}.badge{display:inline-block;margin-top:4px;padding:4px 8px;border-radius:999px;background:#0f172a;color:#cbd5e1;border:1px solid #475569;font-size:12px}
-</style>
-</head>
-<body>
-<h1>Shopping Budget Tracker v4</h1>
-<div class="small">Improved barcode filtering. Price entry formats as dollars while typing.</div>
+body{font-family:Arial,sans-serif;background:#111827;color:white;margin:0;padding:14px 14px 85px}
+.card{background:#1f2937;border-radius:14px;padding:14px;margin:10px 0;border:1px solid #334155}
+h1{font-size:22px;margin:0}h2{font-size:18px;margin:0 0 8px}
+input,button,textarea,select{width:100%;padding:12px;margin-top:8px;border-radius:10px;border:0;font-size:16px;box-sizing:border-box}
+input,textarea,select{background:#0f172a;color:white;border:1px solid #475569}
+button{background:#38bdf8;color:#001018;font-weight:bold}
+.good{background:#22c55e}.warn{background:#f59e0b}.bad{background:#ef4444;color:white}.secondary{background:#334155;color:white}
+.row,.buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.small{font-size:14px;color:#cbd5e1;line-height:1.35}.total{font-size:34px;font-weight:bold}
+.bar{height:18px;background:#334155;border-radius:999px;overflow:hidden;margin-top:10px}.fill{height:100%;width:0%;background:#22c55e}
+.item{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px;margin-top:8px}
+.scanWrap{display:none;position:relative;margin-top:10px}video{width:100%;max-height:340px;background:black;border-radius:12px}
+.scanBox{position:absolute;left:8%;right:8%;top:30%;height:35%;border:3px solid #22c55e;border-radius:12px;box-shadow:0 0 0 999px rgba(0,0,0,.18)}
+.codeBox{background:#020617;border:1px solid #475569;border-radius:10px;padding:10px;margin-top:8px;word-break:break-word}
+footer{position:fixed;bottom:0;left:0;right:0;background:#020617;border-top:1px solid #334155;padding:10px 14px}
+.footer{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+</style></head><body>
+<h1>Shopping Budget Tracker v5</h1><div class="small">Scanner debug build: shows what it sees and lets you accept the code.</div>
 
-<div class="card">
-<h2>Budget</h2>
-<input id="budget" inputmode="numeric" placeholder="Budget limit, example $125.00">
-<div class="total" id="total">$0.00</div>
-<div class="small" id="status">No limit set</div>
-<div class="bar"><div class="fill" id="fill"></div></div>
-</div>
+<div class="card"><h2>Budget</h2>
+<input id="budget" inputmode="numeric" placeholder="Budget, example 12500 = $125.00">
+<div class="total" id="total">$0.00</div><div class="small" id="status">No limit set</div>
+<div class="bar"><div class="fill" id="fill"></div></div></div>
 
-<div class="card">
-<h2>Find / Add Item</h2>
-<input id="name" placeholder="Item name or keywords, example: Equate antacid tablets">
+<div class="card"><h2>Find / Add Item</h2>
+<input id="name" placeholder="Item name or keywords">
 <input id="barcode" inputmode="numeric" placeholder="Barcode / UPC">
-<div class="buttons">
-<button onclick="searchWalmart()">Search Walmart</button>
-<button onclick="startScan()" class="good" id="scanBtn">Scan Barcode</button>
-</div>
-<button onclick="stopScan()" class="secondary" id="stopBtn" disabled>Stop Scan</button>
-<div class="scanWrap" id="scanWrap">
-<video id="video" playsinline muted></video>
-<div class="scanBox"></div>
-</div>
-<div class="small" id="scanStatus">Scanner ignores short random numbers and only accepts likely UPC/EAN codes.</div>
-<div class="row">
-<input id="price" inputmode="numeric" placeholder="Price, example $2.48">
-<input id="qty" inputmode="numeric" value="1" placeholder="Qty">
-</div>
+<select id="scanMode"><option value="loose">Loose mode: show most numeric codes</option><option value="strict">Strict mode: UPC/EAN only</option></select>
+<div class="buttons"><button onclick="searchWalmart()">Search Walmart</button><button class="good" id="scanBtn" onclick="startScan()">Scan Barcode</button></div>
+<div class="buttons"><button class="warn" id="acceptBtn" onclick="acceptSeenCode()" disabled>Accept Seen Code</button><button class="secondary" id="stopBtn" onclick="stopScan()" disabled>Stop Scan</button></div>
+<div class="scanWrap" id="scanWrap"><video id="video" playsinline muted></video><div class="scanBox"></div></div>
+<div class="small" id="scanStatus">Tap scan. If it sees numbers, they will show below.</div>
+<div class="codeBox" id="seenBox">Last seen code: none</div>
+<div class="row"><input id="price" inputmode="numeric" placeholder="Price: 248 = $2.48"><input id="qty" inputmode="numeric" value="1" placeholder="Qty"></div>
 <div class="small" id="pricePreview">Price preview: $0.00</div>
 <textarea id="note" placeholder="Optional note"></textarea>
-<button onclick="addItem()" class="good">Add Item</button>
-</div>
+<button class="good" onclick="addItem()">Add Item</button></div>
 
-<div class="card">
-<h2>Cart</h2>
-<div class="small" id="summary">No items yet.</div>
-<div id="items"></div>
-<button onclick="resetCart()" class="danger">Reset Cart</button>
-</div>
+<div class="card"><h2>Cart</h2><div class="small" id="summary">No items yet.</div><div id="items"></div><button class="bad" onclick="resetCart()">Reset Cart</button></div>
 
-<footer>
-<div class="footer-inner">
-<div><div class="footer-total" id="footerTotal">$0.00 total</div><div class="small" id="footerStatus">Set a budget to track spending.</div></div>
-<button onclick="addItem()">Add</button>
-</div>
-</footer>
+<footer><div class="footer"><div><b id="footerTotal">$0.00 total</b><div class="small" id="footerStatus">Set a budget.</div></div><button onclick="addItem()">Add</button></div></footer>
 
 <script>
-const CART_KEY="shopping_budget_tracker_v4_cart";
-const BUDGET_KEY="shopping_budget_tracker_v4_budget";
-let items=JSON.parse(localStorage.getItem(CART_KEY)||"[]");
-let codeReader=null, scanning=false, lastCandidate="", stableCount=0, scanStartTime=0;
-
+const CART_KEY="sbt_v5_cart",BUDGET_KEY="sbt_v5_budget";
+let items=JSON.parse(localStorage.getItem(CART_KEY)||"[]"),codeReader=null,scanning=false,lastSeenCode="";
 function $(id){return document.getElementById(id)}
-function digitsOnly(raw){return String(raw||"").replace(/\D/g,"")}
-function centsToDollars(raw){let d=digitsOnly(raw);return d?Number(d)/100:0}
+function digitsOnly(v){return String(v||"").replace(/\D/g,"")}
+function cents(v){let d=digitsOnly(v);return d?Number(d)/100:0}
 function money(v){return Number(v||0).toLocaleString("en-US",{style:"currency",currency:"USD"})}
 function save(){localStorage.setItem(CART_KEY,JSON.stringify(items));localStorage.setItem(BUDGET_KEY,$("budget").value||"")}
-function total(){return items.reduce((s,i)=>s+(Number(i.price)||0)*(Number(i.qty)||1),0)}
-function formatCurrencyInput(el){let d=digitsOnly(el.value);el.value=d?money(Number(d)/100):""}
-function updatePricePreview(){$("pricePreview").innerText="Price preview: "+money(centsToDollars($("price").value))}
-function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]||c))}
+function total(){return items.reduce((s,i)=>s+(+i.price||0)*(+i.qty||1),0)}
+function fmtInput(el){let d=digitsOnly(el.value);el.value=d?money(+d/100):""}
+function esc(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]||c))}
 function render(){
- const t=total();$("total").innerText=money(t);$("footerTotal").innerText=money(t)+" total";
- const b=centsToDollars($("budget").value), fill=$("fill"), status=$("status"), foot=$("footerStatus");
- if(b>0){
-  const rem=b-t, pct=Math.min(100,Math.max(0,(t/b)*100));
-  fill.style.width=pct+"%";fill.style.background=pct>=100?"#ef4444":pct>=80?"#f59e0b":"#22c55e";
-  if(rem>=0){status.className=pct>=80?"small warnText":"small goodText";status.innerText=money(rem)+" remaining. You are "+pct.toFixed(0)+"% of the way to your limit.";foot.innerText=money(rem)+" left before "+money(b)}
-  else{status.className="small badText";status.innerText=money(Math.abs(rem))+" over budget.";foot.innerText=money(Math.abs(rem))+" over budget."}
- }else{fill.style.width="0%";status.className="small";status.innerText="No limit set";foot.innerText="Set a budget to track spending."}
+ let t=total(),b=cents($("budget").value),fill=$("fill"),st=$("status"),fs=$("footerStatus");
+ $("total").innerText=money(t);$("footerTotal").innerText=money(t)+" total";
+ if(b>0){let rem=b-t,p=Math.min(100,Math.max(0,t/b*100));fill.style.width=p+"%";fill.style.background=p>=100?"#ef4444":p>=80?"#f59e0b":"#22c55e";st.innerText=rem>=0?money(rem)+" remaining. "+p.toFixed(0)+"% used.":money(Math.abs(rem))+" over budget.";fs.innerText=rem>=0?money(rem)+" left.":money(Math.abs(rem))+" over."}
+ else{fill.style.width="0%";st.innerText="No limit set";fs.innerText="Set a budget."}
  $("summary").innerText=items.length?items.length+" item line(s).":"No items yet.";
- $("items").innerHTML=items.map((item,i)=>{const line=item.price*item.qty;return `<div class="item"><b>${escapeHtml(item.name||"Item")}</b><br><span class="small">${money(item.price)} x ${item.qty} = <b>${money(line)}</b><br>${item.barcode?"Barcode: "+escapeHtml(item.barcode)+"<br>":""}${item.note?"Note: "+escapeHtml(item.note)+"<br>":""}</span><div class="buttons"><button onclick="editItem(${i})" class="secondary">Edit</button><button onclick="deleteItem(${i})" class="danger">Delete</button></div></div>`}).join("");
+ $("items").innerHTML=items.map((it,i)=>`<div class="item"><b>${esc(it.name||"Item")}</b><br><span class="small">${money(it.price)} x ${it.qty} = <b>${money(it.price*it.qty)}</b><br>${it.barcode?"Barcode: "+esc(it.barcode)+"<br>":""}${it.note?"Note: "+esc(it.note)+"<br>":""}</span><div class="buttons"><button class="secondary" onclick="editItem(${i})">Edit</button><button class="bad" onclick="deleteItem(${i})">Delete</button></div></div>`).join("");
 }
 function addItem(){
- const price=centsToDollars($("price").value), qty=Math.max(1,Number(digitsOnly($("qty").value)||"1"));
- const name=$("name").value.trim(), barcode=$("barcode").value.trim();
- if(!name&&!barcode){alert("Enter item name, keywords, or scan barcode first.");return}
- if(price<=0){alert("Enter a price. Example: 248 becomes $2.48");return}
+ let price=cents($("price").value),qty=Math.max(1,Number(digitsOnly($("qty").value)||"1")),name=$("name").value.trim(),barcode=$("barcode").value.trim();
+ if(!name&&!barcode){alert("Enter item name or barcode.");return}
+ if(price<=0){alert("Enter a price. Example 248 = $2.48");return}
  items.push({name:name||"Barcode "+barcode,price,qty,barcode,note:$("note").value.trim()});
- $("name").value="";$("barcode").value="";$("price").value="";$("qty").value="1";$("note").value="";
- updatePricePreview();save();render();
+ $("name").value="";$("barcode").value="";$("price").value="";$("qty").value="1";$("note").value="";updatePreview();save();render();
 }
-function editItem(i){
- const item=items[i];if(!item)return;
- $("name").value=item.name||"";$("barcode").value=item.barcode||"";$("price").value=money(item.price||0);$("qty").value=item.qty||1;$("note").value=item.note||"";
- items.splice(i,1);updatePricePreview();save();render();window.scrollTo({top:0,behavior:"smooth"});
-}
+function editItem(i){let it=items[i];if(!it)return;$("name").value=it.name||"";$("barcode").value=it.barcode||"";$("price").value=money(it.price||0);$("qty").value=it.qty||1;$("note").value=it.note||"";items.splice(i,1);save();render();scrollTo(0,0)}
 function deleteItem(i){items.splice(i,1);save();render()}
 function resetCart(){if(confirm("Reset cart?")){items=[];save();render()}}
-function searchWalmart(){const q=$("name").value.trim()||$("barcode").value.trim();if(!q){alert("Enter item keywords or barcode first.");return}window.open("https://www.walmart.com/search?q="+encodeURIComponent(q),"_blank")}
-function isLikelyRetailBarcode(text){
- const d=digitsOnly(text);
- if(d.length<8)return false;
- if(!(d.length===8||d.length===12||d.length===13))return false;
- if(/^(\d)\1+$/.test(d))return false;
- return true;
-}
+function searchWalmart(){let q=$("name").value.trim()||$("barcode").value.trim();if(!q){alert("Enter search words or barcode.");return}open("https://www.walmart.com/search?q="+encodeURIComponent(q),"_blank")}
+function acceptable(raw){let d=digitsOnly(raw),m=$("scanMode").value;return m==="loose"?(d.length>=5&&d.length<=14):(d.length===8||d.length===12||d.length===13)}
+function showSeen(raw,fmt){let d=digitsOnly(raw);lastSeenCode=d||raw||"";$("acceptBtn").disabled=!lastSeenCode;$("seenBox").innerHTML="Last seen code: <b>"+esc(lastSeenCode||"none")+"</b><br><span class='small'>Format: "+esc(fmt||"unknown")+"</span>";$("scanStatus").innerHTML=acceptable(raw)?"Code seen. Tap <b>Accept Seen Code</b> if it matches.":"Saw code, but current mode may reject it."}
+function acceptSeenCode(){if(!lastSeenCode){alert("No code seen yet.");return}$("barcode").value=lastSeenCode;if(!$("name").value.trim())$("name").value="Barcode "+lastSeenCode;stopScan(false);$("scanStatus").innerHTML="Accepted: <b>"+esc(lastSeenCode)+"</b>"}
 async function startScan(){
  if(scanning)return;
- if(typeof ZXing==="undefined"){alert("Scanner library did not load.");$("scanStatus").innerText="Scanner library did not load. Open this HTTPS page in Chrome or Samsung Internet.";return}
+ if(typeof ZXing==="undefined"){alert("Scanner library did not load.");return}
  try{
   codeReader=new ZXing.BrowserMultiFormatReader();
-  const devices=await codeReader.listVideoInputDevices();
-  if(!devices||!devices.length){alert("No camera found or permission denied.");$("scanStatus").innerText="No camera found or camera permission denied.";return}
-  let back=devices.find(d=>/back|rear|environment/i.test(d.label));
-  let deviceId=back?back.deviceId:devices[devices.length-1].deviceId;
-  $("scanWrap").style.display="block";$("scanBtn").disabled=true;$("stopBtn").disabled=false;
-  $("scanStatus").innerHTML="Scanning... aim the big product barcode inside the green box.";
-  scanning=true;lastCandidate="";stableCount=0;scanStartTime=Date.now();
-  codeReader.decodeFromVideoDevice(deviceId,"video",(result,err)=>{
-   if(result){
-    const raw=result.getText()||"", d=digitsOnly(raw);
-    if(!isLikelyRetailBarcode(raw)){
-     $("scanStatus").innerHTML="Ignoring short/random code: <b>"+escapeHtml(d||raw)+"</b><br><span class='badge'>Need 8, 12, or 13 digits</span>";
-     return;
-    }
-    if(d===lastCandidate)stableCount++;else{lastCandidate=d;stableCount=1}
-    $("scanStatus").innerHTML="Candidate barcode: <b>"+escapeHtml(d)+"</b><br><span class='badge'>Hold steady... "+stableCount+"/2</span>";
-    if(stableCount>=2){$("barcode").value=d;if(!$("name").value.trim())$("name").value="Barcode "+d;$("scanStatus").innerHTML="Captured barcode: <b>"+escapeHtml(d)+"</b>";stopScan(false)}
-   }else if(Date.now()-scanStartTime>15000){
-    $("scanStatus").innerHTML="Still scanning. Move back, add light, and keep only the product UPC inside the green box.";
-   }
-  });
- }catch(e){console.log(e);alert("Could not start camera.");$("scanStatus").innerText="Could not start camera.";stopScan()}
+  let devices=await codeReader.listVideoInputDevices();
+  if(!devices.length){alert("No camera found or permission denied.");return}
+  let back=devices.find(d=>/back|rear|environment/i.test(d.label)),id=back?back.deviceId:devices[devices.length-1].deviceId;
+  scanning=true;lastSeenCode="";$("scanWrap").style.display="block";$("scanBtn").disabled=true;$("stopBtn").disabled=false;$("acceptBtn").disabled=true;$("seenBox").innerText="Last seen code: none";$("scanStatus").innerText="Scanning...";
+  codeReader.decodeFromVideoDevice(id,"video",(result,err)=>{if(result){showSeen(result.getText()||"",result.getBarcodeFormat?String(result.getBarcodeFormat()):"unknown")}})
+ }catch(e){console.log(e);alert("Could not start camera.");stopScan()}
 }
-function stopScan(showMsg=true){
- try{if(codeReader){codeReader.reset();codeReader=null}}catch(e){}
- scanning=false;$("scanWrap").style.display="none";$("scanBtn").disabled=false;$("stopBtn").disabled=true;if(showMsg)$("scanStatus").innerText="Scan stopped."
-}
-$("price").addEventListener("input",()=>{formatCurrencyInput($("price"));updatePricePreview()});
-$("budget").addEventListener("input",()=>{formatCurrencyInput($("budget"));save();render()});
-$("budget").value=localStorage.getItem(BUDGET_KEY)||"";
-updatePricePreview();render();
-</script>
-</body>
-</html>
+function stopScan(msg=true){try{if(codeReader){codeReader.reset();codeReader=null}}catch(e){}scanning=false;$("scanWrap").style.display="none";$("scanBtn").disabled=false;$("stopBtn").disabled=true;if(msg)$("scanStatus").innerText="Scan stopped."}
+function updatePreview(){$("pricePreview").innerText="Price preview: "+money(cents($("price").value))}
+$("price").addEventListener("input",()=>{fmtInput($("price"));updatePreview()});
+$("budget").addEventListener("input",()=>{fmtInput($("budget"));save();render()});
+$("budget").value=localStorage.getItem(BUDGET_KEY)||"";updatePreview();render();
+</script></body></html>
