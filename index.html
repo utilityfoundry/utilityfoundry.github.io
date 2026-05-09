@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Shopping Budget Tracker v5</title>
+<title>Shopping Budget Tracker v6</title>
 <script src="https://unpkg.com/@zxing/library@latest"></script>
 <style>
 body{font-family:Arial,sans-serif;background:#111827;color:white;margin:0;padding:14px 14px 85px}
@@ -20,7 +20,7 @@ button{background:#38bdf8;color:#001018;font-weight:bold}
 footer{position:fixed;bottom:0;left:0;right:0;background:#020617;border-top:1px solid #334155;padding:10px 14px}
 .footer{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
 </style></head><body>
-<h1>Shopping Budget Tracker v5</h1><div class="small">Scanner debug build: shows what it sees and lets you accept the code.</div>
+<h1>Shopping Budget Tracker v6</h1><div class="small">Fixes Walmart search: UPC search uses the barcode field first.</div>
 
 <div class="card"><h2>Budget</h2>
 <input id="budget" inputmode="numeric" placeholder="Budget, example 12500 = $125.00">
@@ -31,11 +31,23 @@ footer{position:fixed;bottom:0;left:0;right:0;background:#020617;border-top:1px 
 <input id="name" placeholder="Item name or keywords">
 <input id="barcode" inputmode="numeric" placeholder="Barcode / UPC">
 <select id="scanMode"><option value="loose">Loose mode: show most numeric codes</option><option value="strict">Strict mode: UPC/EAN only</option></select>
-<div class="buttons"><button onclick="searchWalmart()">Search Walmart</button><button class="good" id="scanBtn" onclick="startScan()">Scan Barcode</button></div>
-<div class="buttons"><button class="warn" id="acceptBtn" onclick="acceptSeenCode()" disabled>Accept Seen Code</button><button class="secondary" id="stopBtn" onclick="stopScan()" disabled>Stop Scan</button></div>
+
+<div class="buttons">
+<button onclick="searchWalmartUPC()">Search UPC</button>
+<button onclick="searchWalmartKeyword()" class="secondary">Search Words</button>
+</div>
+
+<div class="buttons">
+<button class="good" id="scanBtn" onclick="startScan()">Scan Barcode</button>
+<button class="warn" id="acceptBtn" onclick="acceptSeenCode()" disabled>Accept Seen Code</button>
+</div>
+
+<button class="secondary" id="stopBtn" onclick="stopScan()" disabled>Stop Scan</button>
+
 <div class="scanWrap" id="scanWrap"><video id="video" playsinline muted></video><div class="scanBox"></div></div>
 <div class="small" id="scanStatus">Tap scan. If it sees numbers, they will show below.</div>
 <div class="codeBox" id="seenBox">Last seen code: none</div>
+
 <div class="row"><input id="price" inputmode="numeric" placeholder="Price: 248 = $2.48"><input id="qty" inputmode="numeric" value="1" placeholder="Qty"></div>
 <div class="small" id="pricePreview">Price preview: $0.00</div>
 <textarea id="note" placeholder="Optional note"></textarea>
@@ -46,7 +58,7 @@ footer{position:fixed;bottom:0;left:0;right:0;background:#020617;border-top:1px 
 <footer><div class="footer"><div><b id="footerTotal">$0.00 total</b><div class="small" id="footerStatus">Set a budget.</div></div><button onclick="addItem()">Add</button></div></footer>
 
 <script>
-const CART_KEY="sbt_v5_cart",BUDGET_KEY="sbt_v5_budget";
+const CART_KEY="sbt_v6_cart",BUDGET_KEY="sbt_v6_budget";
 let items=JSON.parse(localStorage.getItem(CART_KEY)||"[]"),codeReader=null,scanning=false,lastSeenCode="";
 function $(id){return document.getElementById(id)}
 function digitsOnly(v){return String(v||"").replace(/\D/g,"")}
@@ -74,10 +86,15 @@ function addItem(){
 function editItem(i){let it=items[i];if(!it)return;$("name").value=it.name||"";$("barcode").value=it.barcode||"";$("price").value=money(it.price||0);$("qty").value=it.qty||1;$("note").value=it.note||"";items.splice(i,1);save();render();scrollTo(0,0)}
 function deleteItem(i){items.splice(i,1);save();render()}
 function resetCart(){if(confirm("Reset cart?")){items=[];save();render()}}
-function searchWalmart(){let q=$("name").value.trim()||$("barcode").value.trim();if(!q){alert("Enter search words or barcode.");return}open("https://www.walmart.com/search?q="+encodeURIComponent(q),"_blank")}
+function searchWalmartUPC(){let q=digitsOnly($("barcode").value);if(!q){alert("No UPC/barcode in the barcode box.");return}open("https://www.walmart.com/search?q="+encodeURIComponent(q),"_blank")}
+function searchWalmartKeyword(){let q=$("name").value.trim();if(!q){alert("Enter item words first.");return}open("https://www.walmart.com/search?q="+encodeURIComponent(q),"_blank")}
 function acceptable(raw){let d=digitsOnly(raw),m=$("scanMode").value;return m==="loose"?(d.length>=5&&d.length<=14):(d.length===8||d.length===12||d.length===13)}
-function showSeen(raw,fmt){let d=digitsOnly(raw);lastSeenCode=d||raw||"";$("acceptBtn").disabled=!lastSeenCode;$("seenBox").innerHTML="Last seen code: <b>"+esc(lastSeenCode||"none")+"</b><br><span class='small'>Format: "+esc(fmt||"unknown")+"</span>";$("scanStatus").innerHTML=acceptable(raw)?"Code seen. Tap <b>Accept Seen Code</b> if it matches.":"Saw code, but current mode may reject it."}
-function acceptSeenCode(){if(!lastSeenCode){alert("No code seen yet.");return}$("barcode").value=lastSeenCode;if(!$("name").value.trim())$("name").value="Barcode "+lastSeenCode;stopScan(false);$("scanStatus").innerHTML="Accepted: <b>"+esc(lastSeenCode)+"</b>"}
+function showSeen(raw,fmt){
+ let d=digitsOnly(raw);lastSeenCode=d||raw||"";$("acceptBtn").disabled=!lastSeenCode;
+ $("seenBox").innerHTML="Last seen code: <b>"+esc(lastSeenCode||"none")+"</b><br><span class='small'>Format: "+esc(fmt||"unknown")+"</span>";
+ $("scanStatus").innerHTML=acceptable(raw)?"Code seen. Tap <b>Accept Seen Code</b> if it matches.":"Saw code, but current mode may reject it.";
+}
+function acceptSeenCode(){if(!lastSeenCode){alert("No code seen yet.");return}$("barcode").value=lastSeenCode;if(!$("name").value.trim())$("name").value="";stopScan(false);$("scanStatus").innerHTML="Accepted UPC: <b>"+esc(lastSeenCode)+"</b>"}
 async function startScan(){
  if(scanning)return;
  if(typeof ZXing==="undefined"){alert("Scanner library did not load.");return}
